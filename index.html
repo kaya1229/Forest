@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>강철삼림: 언더커버 추출 작전</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', Courier, monospace; }
+        #ui-layer {
+            position: absolute; top: 20px; left: 20px; color: #00eeff;
+            text-shadow: 0 0 10px #00eeff; pointer-events: none;
+        }
+        #status-log {
+            position: absolute; bottom: 20px; left: 20px; color: #00eeff;
+            background: rgba(0, 20, 40, 0.7); padding: 10px; border: 1px solid #00eeff;
+        }
+        .mission-info { font-size: 1.2em; margin-bottom: 5px; border-bottom: 1px solid #00eeff; }
+        #msg { font-weight: bold; color: #ff3333; }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div class="mission-info">[강철삼림: 언더커버 추출 작전]</div>
+    <div>접선 대상: 요원 장청 (1명)</div>
+    <div>위험 요소: 조직원 매복 (10구역)</div>
+    <div>현재 요원: 저우진 (경찰)</div>
+</div>
+
+<div id="status-log">
+    [SYSTEM] 감시망 해킹 완료... 구역 스캔을 시작하십시오.<br>
+    <span id="msg">상태: 대기 중</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+    // 1. 기본 설정
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000a1a, 0.05);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x00050a);
+    document.body.appendChild(renderer.domElement);
+
+    const gridSize = 8;
+    const tileSize = 2;
+    const tiles = [];
+    let gameOver = false;
+
+    // 2. 조명 설정 (차가운 푸른색)
+    const ambientLight = new THREE.AmbientLight(0x4040ff, 0.5);
+    scene.add(ambientLight);
+    const pointLight = new THREE.PointLight(0x00ffff, 1);
+    pointLight.position.set(10, 10, 10);
+    scene.add(pointLight);
+
+    // 3. 게임 데이터 생성
+    const totalTiles = gridSize * gridSize;
+    let positions = Array.from({length: totalTiles}, (_, i) => i);
+    
+    // 장청 위치 (1개)
+    const jangPosition = positions.splice(Math.floor(Math.random() * positions.length), 1)[0];
+    // 조직원 위치 (10개)
+    const enemyPositions = [];
+    for(let i=0; i<10; i++) {
+        enemyPositions.push(positions.splice(Math.floor(Math.random() * positions.length), 1)[0]);
+    }
+
+    // 4. 도시 구역(타일) 생성
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            const idx = i * gridSize + j;
+            const group = new THREE.Group();
+            
+            // 바닥 (토지)
+            const floorGeo = new THREE.BoxGeometry(tileSize - 0.1, 0.2, tileSize - 0.1);
+            const floorMat = new THREE.MeshPhongMaterial({ color: 0x112233 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            group.add(floor);
+
+            // 건물 생성 (랜덤하게 건물 배치)
+            if (idx === jangPosition || enemyPositions.includes(idx) || Math.random() > 0.5) {
+                const height = 1 + Math.random() * 2;
+                const bGeo = new THREE.BoxGeometry(1, height, 1);
+                const bMat = new THREE.MeshPhongMaterial({ color: 0x223344 });
+                const building = new THREE.Mesh(bGeo, bMat);
+                building.position.y = height / 2;
+                group.add(building);
+                group.userData.hasBuilding = true;
+            }
+
+            group.position.set(i * tileSize - (gridSize * tileSize)/2, 0, j * tileSize - (gridSize * tileSize)/2);
+            group.userData.idx = idx;
+            group.userData.isJang = (idx === jangPosition);
+            group.userData.isEnemy = enemyPositions.includes(idx);
+            group.userData.revealed = false;
+
+            scene.add(group);
+            tiles.push(group);
+        }
+    }
+
+    camera.position.set(0, 15, 15);
+    camera.lookAt(0, 0, 0);
+
+    // 5. 클릭 이벤트
+    window.addEventListener('click', (event) => {
+        if (gameOver) return;
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(scene.children, true);
+
+        if (intersects.length > 0) {
+            let obj = intersects[0].object;
+            while(obj.parent && obj.parent !== scene) obj = obj.parent;
+            
+            if (!obj.userData.revealed) {
+                revealTile(obj);
+            }
+        }
+    });
+
+    function revealTile(tile) {
+        tile.userData.revealed = true;
+        const msgEl = document.getElementById('msg');
+
+        if (tile.userData.isJang) {
+            // 성공
+            tile.children.forEach(c => { if(c.material) c.material.color.set(0x00ff00) });
+            msgEl.innerText = "상태: [성공] 장청 요원 접선 완료. 추출을 시작합니다.";
+            msgEl.style.color = "#00ff00";
+            gameOver = true;
+        } else if (tile.userData.isEnemy) {
+            // 실패
+            tile.children.forEach(c => { if(c.material) c.material.color.set(0xff0000) });
+            msgEl.innerText = "상태: [경고] 조직원에게 발각됨! 작전 실패.";
+            gameOver = true;
+        } else {
+            // 안전
+            tile.children.forEach(c => { if(c.material) c.material.opacity = 0.3; c.material.transparent = true; });
+            document.getElementById('msg').innerText = "상태: 구역 안전. 탐색을 계속하십시오.";
+        }
+    }
+
+    // 6. 애니메이션 루프
+    function animate() {
+        requestAnimationFrame(animate);
+        // 미세하게 화면이 흔들리는 노이즈 효과(옵션)
+        camera.position.x += Math.sin(Date.now() * 0.001) * 0.005;
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // 창 크기 조절 대응
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
