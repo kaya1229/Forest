@@ -33,6 +33,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
+    let collapsingTiles = []; // 붕괴 애니메이션이 진행될 타일들
+    
     const scene = new THREE.Scene();
     // 톤을 조금 더 밝은 네이비 톤으로 조정
     scene.background = new THREE.Color(0x0a1420);
@@ -221,24 +223,51 @@ window.addEventListener('click', (event) => {
         titleEl.innerText = "MISSION COMPLETE";
         gameOver = true;
     } else if (tile.userData.isEnemy) {
-        changeColor(tile, 0xff0000);
+        // --- 조직원 칸 클릭 시 로직 시작 ---
         titleEl.innerText = "MISSION FAILED";
+        bodyEl.innerText = "매복 구역 진입! 모든 은신처가 붕괴됩니다.";
+        bodyEl.style.color = "#ff3333";
         gameOver = true;
+
+        // 모든 타일을 순회하며 적이 있는 칸을 찾아 붕괴 리스트에 추가
+        tiles.forEach(t => {
+            if (t.userData.isEnemy) {
+                changeColor(t, 0xff0000); // 붉게 변경
+                collapsingTiles.push(t);   // 붕괴 리스트 추가
+            }
+        });
+        // --- 로직 끝 ---
     } else {
-        // 안전 구역일 경우 주변 적 숫자 계산
         const count = getEnemyCount(tile.userData.idx);
         changeColor(tile, 0x4488ff);
-        
-        // 홀로그램 레이블 생성 및 배치
-        const labelColor = count > 0 ? "#ffcc00" : "#00eeff"; // 적이 있으면 경고색(노랑)
-        const label = createHologramLabel(count.toString(), labelColor);
-        
-        // 건물 높이에 맞춰 위치 조정 (건물 그룹의 Y축 위치를 고려)
+        const label = createHologramLabel(count.toString(), count > 0 ? "#ffcc00" : "#00eeff");
         label.position.set(0, 5, 0); 
-        tile.add(label); // 타일 그룹에 추가
-        
-        bodyEl.innerText = `주변 감지 결과: 조직원 ${count}명 확인.`;
+        tile.add(label);
     }
+}
+
+    function animate() {
+    requestAnimationFrame(animate);
+    
+    // 붕괴 애니메이션 처리
+    if (collapsingTiles.length > 0) {
+        collapsingTiles.forEach(tile => {
+            // 타일 내의 건물 그룹(보통 index 1 이후의 객체들)을 아래로 내림
+            tile.children.forEach(child => {
+                if (child instanceof THREE.Group || child.geometry instanceof THREE.BoxGeometry) {
+                    // 바닥(y=0) 아래로 서서히 가라앉음
+                    if (child.position.y > -5) {
+                        child.position.y -= 0.05; // 하강 속도
+                        child.rotation.x += 0.01; // 기울어짐
+                        child.rotation.z += 0.005;
+                    }
+                }
+            });
+        });
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
 }
 
     function changeColor(group, color) {
