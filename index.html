@@ -75,4 +75,96 @@
     const mouse = new THREE.Vector2();
 
     for (let i = 0; i < gridSize; i++) {
-        for (let j =
+        for (let j = 0; j < gridSize; j++) {
+            const idx = i * gridSize + j;
+            const group = new THREE.Group();
+            
+            // 타일 바닥
+            const floorGeo = new THREE.BoxGeometry(tileSize - 0.2, 0.3, tileSize - 0.2);
+            const floorMat = new THREE.MeshPhongMaterial({ color: 0x1a2a3a });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            group.add(floor);
+
+            // 건물 오브젝트
+            if (idx === jangPos || enemyPos.includes(idx) || Math.random() > 0.4) {
+                const h = (idx === jangPos || enemyPos.includes(idx)) ? 2.5 : 1 + Math.random() * 2;
+                const bGeo = new THREE.BoxGeometry(1.2, h, 1.2);
+                const bMat = new THREE.MeshPhongMaterial({ color: 0x334455 });
+                const b = new THREE.Mesh(bGeo, bMat);
+                b.position.y = h / 2;
+                group.add(b);
+            }
+
+            group.position.set(i * tileSize - (gridSize * tileSize)/2, 0, j * tileSize - (gridSize * tileSize)/2);
+            group.userData = { idx, isJang: (idx === jangPos), isEnemy: enemyPos.includes(idx), revealed: false };
+            scene.add(group);
+            tiles.push(group);
+        }
+    }
+
+    camera.position.set(15, 18, 15);
+    controls.update();
+
+    window.addEventListener('mousedown', (event) => {
+        if (gameOver) return;
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(scene.children, true);
+
+        if (hits.length > 0) {
+            let obj = hits[0].object;
+            while(obj.parent && obj.parent !== scene) obj = obj.parent;
+            if (!obj.userData.revealed) reveal(obj);
+        }
+    });
+
+    function reveal(tile) {
+        tile.userData.revealed = true;
+        const titleEl = document.getElementById('msg-title');
+        const bodyEl = document.getElementById('msg-body');
+
+        if (tile.userData.isJang) {
+            changeColor(tile, 0x00ff00); // 승리: 초록색
+            titleEl.innerText = "MISSION COMPLETE";
+            bodyEl.innerText = "장청 요원 확보에 성공했습니다. 즉시 이탈하십시오.";
+            bodyEl.style.color = "#00ff00";
+            gameOver = true;
+        } else if (tile.userData.isEnemy) {
+            changeColor(tile, 0xff0000); // 패배: 빨간색
+            titleEl.innerText = "MISSION FAILED";
+            bodyEl.innerText = "경고: 조직원의 매복에 걸렸습니다. 작전 실패.";
+            bodyEl.style.color = "#ff3333";
+            gameOver = true;
+        } else {
+            changeColor(tile, 0x4488ff); // 안전: 밝은 푸른색
+            bodyEl.innerText = "구역 안전. 다음 좌표를 탐색하십시오.";
+        }
+    }
+
+    function changeColor(group, color) {
+        group.children.forEach(mesh => {
+            if(mesh.material) {
+                mesh.material = mesh.material.clone();
+                mesh.material.color.set(color);
+                mesh.material.emissive.set(color);
+                mesh.material.emissiveIntensity = 0.3;
+            }
+        });
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update(); // OrbitControls 업데이트
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
