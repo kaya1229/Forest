@@ -213,37 +213,28 @@ window.addEventListener('click', (event) => {
 }
 
 
-    function reveal(tile) {
-    tile.userData.revealed = true;
-    const titleEl = document.getElementById('msg-title');
-    const bodyEl = document.getElementById('msg-body');
-
-    if (tile.userData.isJang) {
-        changeColor(tile, 0x00ff00);
-        titleEl.innerText = "MISSION COMPLETE";
-        gameOver = true;
-    } else if (tile.userData.isEnemy) {
-        // --- 조직원 칸 클릭 시 로직 시작 ---
-        titleEl.innerText = "MISSION FAILED";
-        bodyEl.innerText = "매복 구역 진입! 모든 은신처가 붕괴됩니다.";
-        bodyEl.style.color = "#ff3333";
-        gameOver = true;
-
-        // 모든 타일을 순회하며 적이 있는 칸을 찾아 붕괴 리스트에 추가
-        tiles.forEach(t => {
-            if (t.userData.isEnemy) {
-                changeColor(t, 0xff0000); // 붉게 변경
-                collapsingTiles.push(t);   // 붕괴 리스트 추가
-            }
+    function animate() {
+    requestAnimationFrame(animate);
+    
+    // 붕괴 애니메이션 처리
+    if (collapsingTiles.length > 0) {
+        collapsingTiles.forEach(tile => {
+            // 타일 내의 건물 그룹(보통 index 1 이후의 객체들)을 아래로 내림
+            tile.children.forEach(child => {
+                if (child instanceof THREE.Group || child.geometry instanceof THREE.BoxGeometry) {
+                    // 바닥(y=0) 아래로 서서히 가라앉음
+                    if (child.position.y > -5) {
+                        child.position.y -= 0.05; // 하강 속도
+                        child.rotation.x += 0.01; // 기울어짐
+                        child.rotation.z += 0.005;
+                    }
+                }
+            });
         });
-        // --- 로직 끝 ---
-    } else {
-        const count = getEnemyCount(tile.userData.idx);
-        changeColor(tile, 0x4488ff);
-        const label = createHologramLabel(count.toString(), count > 0 ? "#ffcc00" : "#00eeff");
-        label.position.set(0, 5, 0); 
-        tile.add(label);
     }
+
+    controls.update();
+    renderer.render(scene, camera);
 }
 
     function animate() {
