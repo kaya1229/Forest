@@ -269,29 +269,7 @@ window.addEventListener('click', (event) => {
     renderer.render(scene, camera);
 }
 
-    function animate() {
-    requestAnimationFrame(animate);
     
-    // 붕괴 애니메이션 처리
-    if (collapsingTiles.length > 0) {
-        collapsingTiles.forEach(tile => {
-            // 타일 내의 건물 그룹(보통 index 1 이후의 객체들)을 아래로 내림
-            tile.children.forEach(child => {
-                if (child instanceof THREE.Group || child.geometry instanceof THREE.BoxGeometry) {
-                    // 바닥(y=0) 아래로 서서히 가라앉음
-                    if (child.position.y > -5) {
-                        child.position.y -= 0.05; // 하강 속도
-                        child.rotation.x += 0.01; // 기울어짐
-                        child.rotation.z += 0.005;
-                    }
-                }
-            });
-        });
-    }
-
-    controls.update();
-    renderer.render(scene, camera);
-}
 
     function changeColor(group, color) {
         group.children.forEach(mesh => {
@@ -304,11 +282,7 @@ window.addEventListener('click', (event) => {
         });
     }
 
-    function animate() {
-        requestAnimationFrame(animate);
-        controls.update(); // OrbitControls 업데이트
-        renderer.render(scene, camera);
-    }
+    
     animate();
 
     window.addEventListener('resize', () => {
