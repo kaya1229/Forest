@@ -171,6 +171,38 @@ window.addEventListener('click', (event) => {
         }
     }
 });
+    function reveal(tile) {
+    tile.userData.revealed = true;
+    const titleEl = document.getElementById('msg-title');
+    const bodyEl = document.getElementById('msg-body');
+
+    if (tile.userData.isJang) {
+        changeColor(tile, 0x00ff00);
+        titleEl.innerText = "MISSION COMPLETE";
+        gameOver = true;
+    } else if (tile.userData.isEnemy) {
+        titleEl.innerText = "MISSION FAILED";
+        bodyEl.innerText = "매복 구역 진입! 모든 은신처가 붕괴됩니다.";
+        bodyEl.style.color = "#ff3333";
+        gameOver = true;
+
+        // 모든 타일을 돌며 적이 있는 칸을 붕괴 상태로 전환
+        tiles.forEach(t => {
+            if (t.userData.isEnemy) {
+                changeColor(t, 0xff0000); 
+                t.userData.isCollapsing = true; // 붕괴 플래그 설정
+                collapsingTiles.push(t);
+            }
+        });
+    } else {
+        // (안전 구역 로직은 동일...)
+        const count = getEnemyCount(tile.userData.idx);
+        changeColor(tile, 0x4488ff);
+        const label = createHologramLabel(count.toString(), count > 0 ? "#ffcc00" : "#00eeff");
+        label.position.set(0, 5, 0); 
+        tile.add(label);
+    }
+}
 
     function getEnemyCount(idx) {
     let count = 0;
