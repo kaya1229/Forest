@@ -105,19 +105,36 @@
     camera.position.set(15, 18, 15);
     controls.update();
 
-    window.addEventListener('mousedown', (event) => {
-        if (gameOver) return;
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(scene.children, true);
+    
 
-        if (hits.length > 0) {
-            let obj = hits[0].object;
-            while(obj.parent && obj.parent !== scene) obj = obj.parent;
-            if (!obj.userData.revealed) reveal(obj);
+// 윈도우 mousedown 대신 click 또는 pointerdown 권장
+window.addEventListener('click', (event) => {
+    if (gameOver) return;
+
+    // 마우스 좌표 정규화
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    // scene.children 대신 tiles 배열을 직접 검사하여 정확도 향상
+    const hits = raycaster.intersectObjects(tiles, true);
+
+    if (hits.length > 0) {
+        let obj = hits[0].object;
+        
+        // 클릭된 메쉬의 최상위 부모(Group) 찾기
+        while(obj.parent && !tiles.includes(obj)) {
+            obj = obj.parent;
         }
-    });
+        
+        if (obj && !obj.userData.revealed) {
+            reveal(obj);
+        }
+    }
+});
+
+
 
     function reveal(tile) {
         tile.userData.revealed = true;
