@@ -2,68 +2,65 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>강철삼림: 3D 구역 수사 시스템</title>
+    <title>강철삼림: 전술 수사망 네트워크</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #050a10; font-family: 'Malgun Gothic', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #020508; font-family: 'Courier New', monospace; }
         #ui-layer {
-            position: absolute; top: 20px; left: 20px; color: #00eeff;
-            text-shadow: 0 0 8px #00eeff; pointer-events: none; z-index: 10;
+            position: absolute; top: 30px; left: 30px; color: #00ffff;
+            text-shadow: 0 0 10px #00ffff; pointer-events: none; z-index: 10;
         }
         #status-log {
-            position: absolute; bottom: 20px; left: 20px; color: #00eeff;
-            background: rgba(0, 30, 60, 0.8); padding: 15px; border: 2px solid #00eeff;
-            border-radius: 5px; min-width: 300px;
+            position: absolute; bottom: 30px; left: 30px; color: #00ffff;
+            background: rgba(0, 20, 40, 0.7); padding: 20px; border: 1px solid #00ffff;
+            box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.2); min-width: 320px;
         }
-        .instr { font-size: 0.8em; color: #aaa; margin-top: 5px; }
+        .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: rgba(0, 255, 255, 0.1); animation: scan 4s linear infinite; }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
     </style>
 </head>
 <body>
 
+<div class="scan-line"></div>
 <div id="ui-layer">
-    <div style="font-size: 1.5em; border-bottom: 2px solid #00eeff;">[강철삼림: 3D 감시 네트워크]</div>
-    <div class="instr">마우스 드래그: 회전 | 휠: 확대/축소</div>
+    <div style="font-size: 1.8em; letter-spacing: 2px;">[ SECTOR SCANNING: ACTIVE ]</div>
+    <div style="font-size: 0.9em; opacity: 0.7; margin-top: 5px;">TACTICAL HUD V3.0 | CONNECTION STABLE</div>
 </div>
 
 <div id="status-log">
-    <div id="msg-title" style="font-weight: bold;">SYSTEM READY</div>
-    <div id="msg-body">구역을 클릭하여 스캔하십시오. (조직원 10명 매복)</div>
+    <div id="msg-title" style="font-weight: bold; font-size: 1.2em; margin-bottom: 5px;">READY FOR ANALYSIS</div>
+    <div id="msg-body">좌표를 선택하여 정밀 스캔을 시작하십시오.</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
-    let collapsingTiles = []; // 붕괴 애니메이션이 진행될 타일들
-    
     const scene = new THREE.Scene();
-    // 톤을 조금 더 밝은 네이비 톤으로 조정
-    scene.background = new THREE.Color(0x0a1420);
-    scene.fog = new THREE.FogExp2(0x0a1420, 0.03);
+    scene.background = new THREE.Color(0x020508);
+    scene.fog = new THREE.FogExp2(0x020508, 0.05);
 
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // --- 마우스 컨트롤 추가 ---
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; 
+    controls.enableDamping = true;
 
-    // --- 조명 강화 (조금 더 밝게) ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // 환경광 강화
+    // 조명 세팅 - 이미지의 차가운 느낌 재현
+    const ambientLight = new THREE.AmbientLight(0x00ffff, 0.2);
     scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0x00eeff, 0xaa5500, 0.5);
-    scene.add(hemiLight);
-    const pointLight = new THREE.PointLight(0xffffff, 0.8);
-    pointLight.position.set(20, 30, 20);
-    scene.add(pointLight);
+    const dirLight = new THREE.DirectionalLight(0x00ffff, 0.8);
+    dirLight.position.set(10, 20, 10);
+    scene.add(dirLight);
 
     const gridSize = 8;
-    const tileSize = 2.5;
+    const tileSize = 3;
     const tiles = [];
+    let collapsingTiles = [];
     let gameOver = false;
 
-    // 데이터 배치
+    // 데이터 배치 (지뢰찾기 로직)
     const totalTiles = gridSize * gridSize;
     let posArr = Array.from({length: totalTiles}, (_, i) => i);
     const jangPos = posArr.splice(Math.floor(Math.random() * posArr.length), 1)[0];
@@ -72,9 +69,37 @@
         enemyPos.push(posArr.splice(Math.floor(Math.random() * posArr.length), 1)[0]);
     }
 
-    // 도시 생성
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    // 바닥 그리드 추가
+    const gridHelper = new THREE.GridHelper(gridSize * tileSize, gridSize, 0x00ffff, 0x002222);
+    gridHelper.position.y = 0.01;
+    scene.add(gridHelper);
+
+    // 건물 생성 함수 - <강철삼림> 이미지 스타일 반영
+    function createBuilding(h, isSpecial) {
+        const group = new THREE.Group();
+        const w = 1.2;
+
+        // 본체
+        const bodyGeo = new THREE.BoxGeometry(w, h, w);
+        const bodyMat = new THREE.MeshPhongMaterial({ color: 0x050a15, transparent: true, opacity: 0.8 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        group.add(body);
+
+        // 테두리 네온 (Wireframe)
+        const edgeGeo = new THREE.EdgesGeometry(bodyGeo);
+        const edgeMat = new THREE.LineBasicMaterial({ color: isSpecial ? 0x00ffff : 0x005577 });
+        const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+        group.add(edges);
+
+        // 옥상 구조물
+        if (h > 2) {
+            const roofGeo = new THREE.BoxGeometry(w*0.5, 0.3, w*0.5);
+            const roof = new THREE.Mesh(roofGeo, bodyMat);
+            roof.position.y = h/2 + 0.15;
+            group.add(roof);
+        }
+        return group;
+    }
 
     for (let i = 0; i < gridSize; i++) {
         for (let j = 0; j < gridSize; j++) {
@@ -82,207 +107,113 @@
             const group = new THREE.Group();
             
             // 타일 바닥
-            const floorGeo = new THREE.BoxGeometry(tileSize - 0.2, 0.3, tileSize - 0.2);
-            const floorMat = new THREE.MeshPhongMaterial({ color: 0x1a2a3a });
+            const floorGeo = new THREE.PlaneGeometry(tileSize - 0.2, tileSize - 0.2);
+            const floorMat = new THREE.MeshBasicMaterial({ color: 0x001122, side: THREE.DoubleSide });
             const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = Math.PI / 2;
             group.add(floor);
 
-            // 건물 오브젝트
-            // 건물 오브젝트 생성 루프 내부
-if (idx === jangPos || enemyPos.includes(idx) || Math.random() > 0.4) {
-    const isSpecial = (idx === jangPos || enemyPos.includes(idx));
-    const h = isSpecial ? 4 : 1.5 + Math.random() * 3; // 특수 타일은 더 높게
-    const w = 1.2;
+            // 건물 배치
+            const h = (idx === jangPos || enemyPos.includes(idx)) ? 3.5 : 1 + Math.random() * 2.5;
+            const b = createBuilding(h, (idx === jangPos || enemyPos.includes(idx)));
+            b.position.y = h/2;
+            group.add(b);
 
-    const buildingGroup = new THREE.Group();
-
-    // 1. 건물 본체 (어두운 외벽)
-    const bodyGeo = new THREE.BoxGeometry(w, h, w);
-    const bodyMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    buildingGroup.add(body);
-
-    // 2. 창문 디테일 (Wireframe 레이어를 겹쳐서 창문 느낌 생성)
-    const windowGeo = new THREE.BoxGeometry(w + 0.01, h - 0.2, w + 0.01);
-    const windowMat = new THREE.MeshPhongMaterial({
-        color: isSpecial ? 0x00eeff : 0x445566,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.3
-    });
-    const windows = new THREE.Mesh(windowGeo, windowMat);
-    buildingGroup.add(windows);
-
-    // 3. 옥상 구조물 (작은 박스 추가)
-    const roofGeo = new THREE.BoxGeometry(w * 0.6, 0.4, w * 0.6);
-    const roofMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
-    const roof = new THREE.Mesh(roofGeo, roofMat);
-    roof.position.y = h / 2 + 0.2;
-    buildingGroup.add(roof);
-
-    // 4. 네온 안테나 (특수 타일인 경우 강조)
-    if (isSpecial) {
-        const antGeo = new THREE.CylinderGeometry(0.02, 0.02, 1);
-        const antMat = new THREE.MeshBasicMaterial({ color: 0x00eeff });
-        const antenna = new THREE.Mesh(antGeo, antMat);
-        antenna.position.set(0, h / 2 + 0.5, 0);
-        buildingGroup.add(antenna);
-    }
-
-    buildingGroup.position.y = h / 2;
-    group.add(buildingGroup);
-}
-
-            group.position.set(i * tileSize - (gridSize * tileSize)/2, 0, j * tileSize - (gridSize * tileSize)/2);
+            group.position.set(i * tileSize - (gridSize * tileSize)/2 + tileSize/2, 0, j * tileSize - (gridSize * tileSize)/2 + tileSize/2);
             group.userData = { idx, isJang: (idx === jangPos), isEnemy: enemyPos.includes(idx), revealed: false };
             scene.add(group);
             tiles.push(group);
         }
     }
 
-    camera.position.set(15, 18, 15);
-    controls.update();
+    camera.position.set(20, 20, 20);
 
-    
+    // 클릭 이벤트
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
 
-// 윈도우 mousedown 대신 click 또는 pointerdown 권장
-window.addEventListener('click', (event) => {
-    if (gameOver) return;
+    renderer.domElement.addEventListener('click', (event) => {
+        if (gameOver) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // 마우스 좌표 정규화
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(tiles, true);
 
-    raycaster.setFromCamera(mouse, camera);
-
-    // scene.children 대신 tiles 배열을 직접 검사하여 정확도 향상
-    const hits = raycaster.intersectObjects(tiles, true);
-
-    if (hits.length > 0) {
-        let obj = hits[0].object;
-        
-        // 클릭된 메쉬의 최상위 부모(Group) 찾기
-        while(obj.parent && !tiles.includes(obj)) {
-            obj = obj.parent;
+        if (hits.length > 0) {
+            let obj = hits[0].object;
+            while(obj.parent && !tiles.includes(obj)) obj = obj.parent;
+            if (obj && !obj.userData.revealed) reveal(obj);
         }
-        
-        if (obj && !obj.userData.revealed) {
-            reveal(obj);
-        }
-    }
-});
-    function reveal(tile) {
-    tile.userData.revealed = true;
-    const titleEl = document.getElementById('msg-title');
-    const bodyEl = document.getElementById('msg-body');
-
-    if (tile.userData.isJang) {
-        changeColor(tile, 0x00ff00);
-        titleEl.innerText = "MISSION COMPLETE";
-        gameOver = true;
-    } else if (tile.userData.isEnemy) {
-        titleEl.innerText = "MISSION FAILED";
-        bodyEl.innerText = "매복 구역 진입! 모든 은신처가 붕괴됩니다.";
-        bodyEl.style.color = "#ff3333";
-        gameOver = true;
-
-        // 모든 타일을 돌며 적이 있는 칸을 붕괴 상태로 전환
-        tiles.forEach(t => {
-            if (t.userData.isEnemy) {
-                changeColor(t, 0xff0000); 
-                t.userData.isCollapsing = true; // 붕괴 플래그 설정
-                collapsingTiles.push(t);
-            }
-        });
-    } else {
-        // (안전 구역 로직은 동일...)
-        const count = getEnemyCount(tile.userData.idx);
-        changeColor(tile, 0x4488ff);
-        const label = createHologramLabel(count.toString(), count > 0 ? "#ffcc00" : "#00eeff");
-        label.position.set(0, 5, 0); 
-        tile.add(label);
-    }
-}
+    });
 
     function getEnemyCount(idx) {
-    let count = 0;
-    const r = Math.floor(idx / gridSize);
-    const c = idx % gridSize;
-
-    for (let i = -1; i <= 1; i++) {
-        for (let j = -1; j <= 1; j++) {
-            if (i === 0 && j === 0) continue;
-            const nr = r + i;
-            const nc = c + j;
-            if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
-                const neighborIdx = nr * gridSize + nc;
-                if (enemyPos.includes(neighborIdx)) count++;
+        let count = 0;
+        const r = Math.floor(idx / gridSize);
+        const c = idx % gridSize;
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                if (i === 0 && j === 0) continue;
+                const nr = r + i, nc = c + j;
+                if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                    if (enemyPos.includes(nr * gridSize + nc)) count++;
+                }
             }
         }
+        return count;
     }
-    return count;
-}
-    function createHologramLabel(text, color) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 128;
-    canvas.height = 128;
 
-    // 네온 스타일 숫자 그리기
-    ctx.font = 'Bold 80px Arial';
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = color;
-    ctx.fillText(text, 64, 90);
+    function reveal(tile) {
+        tile.userData.revealed = true;
+        const titleEl = document.getElementById('msg-title');
+        const bodyEl = document.getElementById('msg-body');
 
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-    const sprite = new THREE.Sprite(spriteMat);
-    
-    sprite.scale.set(2, 2, 1); // 숫자 크기
-    return sprite;
-}
+        if (tile.userData.isJang) {
+            updateColors(tile, 0x00ff00);
+            titleEl.innerText = "AGENT SECURED";
+            gameOver = true;
+        } else if (tile.userData.isEnemy) {
+            titleEl.innerText = "AMBUSH DETECTED";
+            bodyEl.innerText = "시스템 오염... 모든 구역 폐쇄 중.";
+            gameOver = true;
+            tiles.forEach(t => { if(t.userData.isEnemy) { updateColors(t, 0xff0000); collapsingTiles.push(t); }});
+        } else {
+            const count = getEnemyCount(tile.userData.idx);
+            updateColors(tile, 0x00ffff);
+            // 홀로그램 숫자 생성 (생략 가능하나 기능 유지)
+            bodyEl.innerText = `구역 안전. 인접 위협 수준: ${count}`;
+        }
+    }
 
-
-    function animate() {
-    requestAnimationFrame(animate);
-    
-    // 붕괴 애니메이션 처리
-    if (collapsingTiles.length > 0) {
-        collapsingTiles.forEach(tile => {
-            // 타일 내의 건물 그룹(보통 index 1 이후의 객체들)을 아래로 내림
-            tile.children.forEach(child => {
-                if (child instanceof THREE.Group || child.geometry instanceof THREE.BoxGeometry) {
-                    // 바닥(y=0) 아래로 서서히 가라앉음
-                    if (child.position.y > -5) {
-                        child.position.y -= 0.05; // 하강 속도
-                        child.rotation.x += 0.01; // 기울어짐
-                        child.rotation.z += 0.005;
-                    }
+    function updateColors(group, color) {
+        group.traverse(child => {
+            if (child.material) {
+                child.material = child.material.clone();
+                if (child instanceof THREE.LineSegments) child.material.color.set(color);
+                else {
+                    child.material.emissive = new THREE.Color(color);
+                    child.material.emissiveIntensity = 0.5;
                 }
-            });
-        });
-    }
-
-    controls.update();
-    renderer.render(scene, camera);
-}
-
-    
-
-    function changeColor(group, color) {
-        group.children.forEach(mesh => {
-            if(mesh.material) {
-                mesh.material = mesh.material.clone();
-                mesh.material.color.set(color);
-                mesh.material.emissive.set(color);
-                mesh.material.emissiveIntensity = 0.3;
             }
         });
     }
 
-    
+    function animate() {
+        requestAnimationFrame(animate);
+        if (collapsingTiles.length > 0) {
+            collapsingTiles.forEach(t => {
+                t.children.forEach(c => {
+                    if (c.position.y > -10) {
+                        c.position.y -= 0.1;
+                        c.rotation.z += 0.01;
+                    }
+                });
+            });
+        }
+        controls.update();
+        renderer.render(scene, camera);
+    }
     animate();
 
     window.addEventListener('resize', () => {
