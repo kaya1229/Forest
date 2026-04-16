@@ -86,14 +86,50 @@
             group.add(floor);
 
             // 건물 오브젝트
-            if (idx === jangPos || enemyPos.includes(idx) || Math.random() > 0.4) {
-                const h = (idx === jangPos || enemyPos.includes(idx)) ? 2.5 : 1 + Math.random() * 2;
-                const bGeo = new THREE.BoxGeometry(1.2, h, 1.2);
-                const bMat = new THREE.MeshPhongMaterial({ color: 0x334455 });
-                const b = new THREE.Mesh(bGeo, bMat);
-                b.position.y = h / 2;
-                group.add(b);
-            }
+            // 건물 오브젝트 생성 루프 내부
+if (idx === jangPos || enemyPos.includes(idx) || Math.random() > 0.4) {
+    const isSpecial = (idx === jangPos || enemyPos.includes(idx));
+    const h = isSpecial ? 4 : 1.5 + Math.random() * 3; // 특수 타일은 더 높게
+    const w = 1.2;
+
+    const buildingGroup = new THREE.Group();
+
+    // 1. 건물 본체 (어두운 외벽)
+    const bodyGeo = new THREE.BoxGeometry(w, h, w);
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    buildingGroup.add(body);
+
+    // 2. 창문 디테일 (Wireframe 레이어를 겹쳐서 창문 느낌 생성)
+    const windowGeo = new THREE.BoxGeometry(w + 0.01, h - 0.2, w + 0.01);
+    const windowMat = new THREE.MeshPhongMaterial({
+        color: isSpecial ? 0x00eeff : 0x445566,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.3
+    });
+    const windows = new THREE.Mesh(windowGeo, windowMat);
+    buildingGroup.add(windows);
+
+    // 3. 옥상 구조물 (작은 박스 추가)
+    const roofGeo = new THREE.BoxGeometry(w * 0.6, 0.4, w * 0.6);
+    const roofMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.y = h / 2 + 0.2;
+    buildingGroup.add(roof);
+
+    // 4. 네온 안테나 (특수 타일인 경우 강조)
+    if (isSpecial) {
+        const antGeo = new THREE.CylinderGeometry(0.02, 0.02, 1);
+        const antMat = new THREE.MeshBasicMaterial({ color: 0x00eeff });
+        const antenna = new THREE.Mesh(antGeo, antMat);
+        antenna.position.set(0, h / 2 + 0.5, 0);
+        buildingGroup.add(antenna);
+    }
+
+    buildingGroup.position.y = h / 2;
+    group.add(buildingGroup);
+}
 
             group.position.set(i * tileSize - (gridSize * tileSize)/2, 0, j * tileSize - (gridSize * tileSize)/2);
             group.userData = { idx, isJang: (idx === jangPos), isEnemy: enemyPos.includes(idx), revealed: false };
@@ -134,30 +170,76 @@ window.addEventListener('click', (event) => {
     }
 });
 
+    function getEnemyCount(idx) {
+    let count = 0;
+    const r = Math.floor(idx / gridSize);
+    const c = idx % gridSize;
+
+    for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+            if (i === 0 && j === 0) continue;
+            const nr = r + i;
+            const nc = c + j;
+            if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                const neighborIdx = nr * gridSize + nc;
+                if (enemyPos.includes(neighborIdx)) count++;
+            }
+        }
+    }
+    return count;
+}
+    function createHologramLabel(text, color) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 128;
+    canvas.height = 128;
+
+    // 네온 스타일 숫자 그리기
+    ctx.font = 'Bold 80px Arial';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = color;
+    ctx.fillText(text, 64, 90);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(spriteMat);
+    
+    sprite.scale.set(2, 2, 1); // 숫자 크기
+    return sprite;
+}
 
 
     function reveal(tile) {
-        tile.userData.revealed = true;
-        const titleEl = document.getElementById('msg-title');
-        const bodyEl = document.getElementById('msg-body');
+    tile.userData.revealed = true;
+    const titleEl = document.getElementById('msg-title');
+    const bodyEl = document.getElementById('msg-body');
 
-        if (tile.userData.isJang) {
-            changeColor(tile, 0x00ff00); // 승리: 초록색
-            titleEl.innerText = "MISSION COMPLETE";
-            bodyEl.innerText = "장청 요원 확보에 성공했습니다. 즉시 이탈하십시오.";
-            bodyEl.style.color = "#00ff00";
-            gameOver = true;
-        } else if (tile.userData.isEnemy) {
-            changeColor(tile, 0xff0000); // 패배: 빨간색
-            titleEl.innerText = "MISSION FAILED";
-            bodyEl.innerText = "경고: 조직원의 매복에 걸렸습니다. 작전 실패.";
-            bodyEl.style.color = "#ff3333";
-            gameOver = true;
-        } else {
-            changeColor(tile, 0x4488ff); // 안전: 밝은 푸른색
-            bodyEl.innerText = "구역 안전. 다음 좌표를 탐색하십시오.";
-        }
+    if (tile.userData.isJang) {
+        changeColor(tile, 0x00ff00);
+        titleEl.innerText = "MISSION COMPLETE";
+        gameOver = true;
+    } else if (tile.userData.isEnemy) {
+        changeColor(tile, 0xff0000);
+        titleEl.innerText = "MISSION FAILED";
+        gameOver = true;
+    } else {
+        // 안전 구역일 경우 주변 적 숫자 계산
+        const count = getEnemyCount(tile.userData.idx);
+        changeColor(tile, 0x4488ff);
+        
+        // 홀로그램 레이블 생성 및 배치
+        const labelColor = count > 0 ? "#ffcc00" : "#00eeff"; // 적이 있으면 경고색(노랑)
+        const label = createHologramLabel(count.toString(), labelColor);
+        
+        // 건물 높이에 맞춰 위치 조정 (건물 그룹의 Y축 위치를 고려)
+        label.position.set(0, 5, 0); 
+        tile.add(label); // 타일 그룹에 추가
+        
+        bodyEl.innerText = `주변 감지 결과: 조직원 ${count}명 확인.`;
     }
+}
 
     function changeColor(group, color) {
         group.children.forEach(mesh => {
